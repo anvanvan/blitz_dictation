@@ -3,8 +3,11 @@ import io
 import wave
 
 import pyaudio
+import structlog
 
 from smart_dictation import hotkeys
+
+log = structlog.get_logger(__name__)
 
 SAMPLE_RATE = 16000
 SAMPLE_WIDTH = 2
@@ -34,6 +37,7 @@ def get_default_device() -> tuple[int, str]:
         return int(val["index"]), str(val["name"])
     finally:
         p.terminate()
+    # This line should never be reached, but just in case
     return None, "default"
 
 
@@ -57,11 +61,19 @@ async def record_audio(
     )
     try:
         frames = []
+        log.info("Recording started, waiting for stop event")
+
+        # Check if the stop event is already set (shouldn't be, but just in case)
+        if stop_event.is_set():
+            log.warning("Stop event was already set at recording start")
+
+        # Record until the stop event is set
         while not stop_event.is_set():
             data = stream.read(frames_per_buffer)
             frames.append(data)
             await asyncio.sleep(0.0)
-        await stop_event.wait()
+
+        log.info("Stop event received, stopping recording")
         samples = b"".join(frames)
         if infer_time(samples) > 1.0:
             return convert(

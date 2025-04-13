@@ -17,6 +17,9 @@ dependencies = [
     "structlog>=24.4.0",
     "numpy>=2.1.2,<3",
     "pywhispercpp @ git+https://github.com/abdeladim-s/pywhispercpp.git@41545c8638f3a444bab26509738a70e3b02d18b2",
+    "pyobjc-core>=9.2; platform_system=='Darwin'",
+    "pyobjc-framework-Quartz>=9.2; platform_system=='Darwin'",
+    "pyobjc-framework-AppKit>=9.2; platform_system=='Darwin'",
 ]
 
 [project.optional-dependencies]
