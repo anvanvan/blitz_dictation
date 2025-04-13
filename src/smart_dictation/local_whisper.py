@@ -17,7 +17,6 @@ def to_whisper_ndarray(frames, *, sample_rate, channels, sample_width):
 class WhisperCppTranscriber:
     def __init__(self):
         pywhispercpp.model.logging = structlog.get_logger()
-        self.language = cfg.language
 
     @cached_property
     def model(self):
@@ -31,6 +30,6 @@ class WhisperCppTranscriber:
         self.model
 
     async def __call__(self, audio_data: np.ndarray):
-        segments = self.model.transcribe(audio_data, language=self.language)
+        segments = self.model.transcribe(audio_data, language=None)
         await asyncio.sleep(0)
         return " ".join([segment.text for segment in segments])

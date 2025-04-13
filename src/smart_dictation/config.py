@@ -23,7 +23,6 @@ class WhisperConfig(BaseSettings):
     whisper_models_dir: Path = Field(default=Path(MODEL_DIR), alias="models_dir")
     n_threads: int = Field(default=6, alias="threads")
     hotkey: str = Field(default="<ctrl>")
-    language: str = Field(default="", alias="lang")
     input_device_index: int | None = Field(default=None)
 
     model_config = SettingsConfigDict(
