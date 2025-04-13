@@ -25,23 +25,55 @@ match (cfg.whisper_impl):
 
 
 async def dictate(key_released):
+def select_device_from_menu():
+    """Display a menu of available input devices and let the user select one."""
+    devices = get_sound_devices()
 
-    device_info = get_device_info(cfg.input_device_index)
-    await log.ainfo("Recording, device: %s", device_info["name"])
-    wave = await record_audio(
-        key_released, convert=to_whisper_ndarray, device=cfg.input_device_index
-    )
-    text = await transcribe(wave)
-    await log.ainfo("Pasting: %s", text)
-    await clipboard.paste_text(text)
+    # Show current default device
+    _, default_name = get_default_device()
+    print(f"Current default device: {default_name}")
 
+    # Display device selection menu
+    print("\nSelect an input device:")
+    for i, (_, device_name) in enumerate(devices, 1):
+        print(f"{i}. {device_name}")
+
+    # Get default device index for empty input handling
+    default_idx, _ = get_default_device()
+
+    while True:
+        try:
+            choice = input("\nEnter the number of your choice (or Enter = default device): ")
+
+            # If user presses Enter, use the default device
+            if choice.strip() == '':
+                print(f"\nUsing default device: {default_name}")
+                return default_idx
+
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(devices):
+                selected_id, selected_name = devices[choice_idx]
+                print(f"\nSelected device: {selected_name}")
+                return selected_id
+            else:
+                print("Invalid selection. Please try again.")
+        except ValueError:
+            print("Please enter a valid number.")
 
 async def start_listening():
     if cfg.input_device_index is None:
-        await log.ainfo("No input device specified, using default")
-        idx, name = get_default_device()
-        print(f"Current device id: {idx} - {name}")
-        list_sound_devices()
+        # Display device selection menu
+        selected_device = select_device_from_menu()
+
+        # Update the configuration with the selected device
+        cfg.input_device_index = selected_device
+
+        # Show the selected device
+        device_info = get_device_info(cfg.input_device_index)
+        print(f"Using device: {device_info['name']}")
+    else:
+        device_info = get_device_info(cfg.input_device_index)
+        print(f"Using device: {device_info['name']}")
 
     transcribe.preload()
     await hotkeys.listen_for_hotkeys({cfg.hotkey: dictate})
