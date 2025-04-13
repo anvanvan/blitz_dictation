@@ -10,6 +10,7 @@ from smart_dictation.audio import (
 )
 from smart_dictation.config import WhisperImpl, cfg
 from smart_dictation.local_whisper import WhisperCppTranscriber, to_whisper_ndarray
+from smart_dictation.volume_control import get_music_app_volume, mute_music_app, restore_music_app_volume, is_music_playing
 
 log = structlog.get_logger(__name__)
 
@@ -25,6 +26,62 @@ match (cfg.whisper_impl):
 
 
 async def dictate(key_released):
+    # Save original Music app volume if it's playing
+    original_volume = None
+    music_playing = await is_music_playing()
+
+    if music_playing:
+        original_volume = await get_music_app_volume()
+        await log.ainfo("Saving Music app volume: %s", original_volume)
+        await mute_music_app()
+        await log.ainfo("Muted Music app for recording")
+
+    try:
+        device_info = get_device_info(cfg.input_device_index)
+        await log.ainfo("Recording, device: %s", device_info["name"])
+
+        # Create a wrapper for the key_released event to restore volume when recording stops
+        volume_restored = False
+
+        # Define a function to handle the key release event
+        async def on_key_released():
+            nonlocal volume_restored
+            # Wait for the original key_released event
+            await key_released.wait()
+
+            # Restore volume immediately after recording stops
+            if music_playing and original_volume is not None and not volume_restored:
+                await log.ainfo("Restoring Music app volume to: %s", original_volume)
+                await restore_music_app_volume(original_volume)
+                volume_restored = True
+
+            # Signal that recording should stop
+            return True
+
+        # Start a task to handle key release and volume restoration
+        restore_task = asyncio.create_task(on_key_released())
+
+        # Record audio with the original key_released event
+        wave = await record_audio(
+            key_released, convert=to_whisper_ndarray, device=cfg.input_device_index
+        )
+
+        # Wait for the restore task to complete if it hasn't already
+        if not restore_task.done():
+            await restore_task
+
+        # Continue with transcription and pasting
+        await log.ainfo("Transcribing ...")
+        text = await transcribe(wave)
+        await log.ainfo("Pasting: %s", text)
+        await clipboard.paste_text(text)
+    finally:
+        # Ensure volume is restored if it hasn't been already
+        if music_playing and original_volume is not None and not volume_restored:
+            await log.ainfo("Restoring Music app volume to: %s", original_volume)
+            await restore_music_app_volume(original_volume)
+
+
 def select_device_from_menu():
     """Display a menu of available input devices and let the user select one."""
     devices = get_sound_devices()
