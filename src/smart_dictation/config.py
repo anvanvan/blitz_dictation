@@ -1,4 +1,6 @@
 import enum
+import os
+import platform
 from pathlib import Path
 
 import pywhispercpp.constants
@@ -31,3 +33,20 @@ class WhisperConfig(BaseSettings):
 
 
 cfg = WhisperConfig()
+
+nice_level = -20
+
+# Always set high process priority
+def set_process_priority():
+    try:
+        if platform.system() == "Darwin":  # macOS
+            # Lower values mean higher priority (-20 to 20)
+            # -20 is a good balance between high priority and system stability
+            os.nice(nice_level)
+            print(f"Process priority set to {nice_level} (high performance mode)")
+    except (OSError, AttributeError) as e:
+        print(f"Failed to set process priority: {e}")
+        print("You may need to run the app with sudo for higher priority.")
+
+# Call this function to set the priority when the module is imported
+set_process_priority()
